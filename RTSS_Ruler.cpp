@@ -2,6 +2,8 @@
 #include "RTSS_Ruler.h"
 #include "RTSSSharedMemory.h"
 
+#define M_PI 3.14159265358979323846
+
 #define Map1 "RTSS_Ruler_Overlay"
 #define Map2 "RTSS_Ruler_Placeholder"
 
@@ -19,9 +21,11 @@ void ReleaseOSD(LPCSTR mapName);
 DWORD ruler_scale = 225;
 DWORD ruler_pixscale = 100;
 DWORD ruler_dist = 225;
-CHAR ruler_outtext[256]="225";
+std::string outputstr = "";
+CHAR ruler_outtext[256]="0";
 bool changeState;
 POINT first, second;
+HWND hWnd;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
@@ -52,18 +56,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	if (!RegisterClassExW(&wcex))
 		return FALSE;
 
-	HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+	/*HWND*/ hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, 0,
-		425, GetSystemMetrics(SM_CYMIN) + 150,
+		425, GetSystemMetrics(SM_CYMIN) + 200,
 		nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd)
 		return FALSE;
+
+	CreateWindowW(
+		TEXT("EDIT"),
+		TEXT("Distance: 0\r\nAzimuth: 0"),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY,
+		2, 2, 400, 36, hWnd, (HMENU)4, hInstance, NULL);
 	
 	CreateWindowW(
 		TEXT("EDIT"),
-		TEXT("F1 - first point \r\n"
-			"F2 - second point \r\n"
+		TEXT("F1 - first point (on enemy)\r\n"
+			"F2 - second point (on yourself)\r\n"
 			"F3 - set scale \r\n"
 			"RightCtrl + Num0 - Default settings \r\n"
 			"RightCtrl + Num2, Num4, Num6, Num8 - move by 1 pixel \r\n"
@@ -71,19 +81,19 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			"RightCtrl + Num+ - increase size by 10% \r\n"
 			"RightCtrl + Num- - decrease size by 10%"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY,
-		2, 2, 400, 122, hWnd, (HMENU)1, hInstance, NULL);
+		2, 40, 400, 132, hWnd, (HMENU)1, hInstance, NULL);
 
 	CreateWindowW(
-		TEXT("EDIT"), TEXT("225"),
+		TEXT("EDIT"), TEXT("0"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER,
-		2, 126, 100, 20, hWnd, (HMENU)2, hInstance, NULL);
+		2, 174, 100, 20, hWnd, (HMENU)2, hInstance, NULL);
 
 	CreateWindowW(
 		TEXT("BUTTON"), TEXT("Apply"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER,
-		104, 126, 100, 20, hWnd, (HMENU)3, hInstance, NULL);
+		104, 174, 100, 20, hWnd, (HMENU)3, hInstance, NULL);
 
-	UpdateOSD("225", Map1);
+	UpdateOSD("0", Map1);
 	UpdateOSD("", Map2);
 
 	DWORD dwThreadId;
@@ -91,7 +101,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	ShowWindow(hWnd, nCmdShow);
 	UpdateWindow(hWnd);
-
+	
 	MSG msg;
 
 	while (GetMessage(&msg, nullptr, 0, 0))
@@ -225,7 +235,26 @@ DWORD WINAPI ThreadProc(LPVOID param)
 			double y = first.y - second.y;
 			changeState = false;
 			DWORD newdistance = (sqrt(x * x + y * y) / ruler_pixscale) * ruler_scale;
-			strcpy_s(ruler_outtext, std::to_string(newdistance).c_str());
+			double ang;
+			if (x > 0) {
+				if (y < 0) {
+					ang = std::atan(x / (-y)) * 180 / M_PI;
+				}
+				else {
+					ang = 90 + std::atan(y / x) * 180 / M_PI;
+				}
+			}
+			else {
+				if (y < 0) {
+					ang = 360 - std::atan(x / y) * 180 / M_PI;
+				}
+				else {
+					ang = 180 + std::atan((-x) / y) * 180 / M_PI;
+				}
+			}
+			outputstr = "Distance: " + std::to_string(newdistance) + "\r\nAzimuth: " + std::to_string(ang);
+			SetDlgItemTextA(hWnd, 4, outputstr.c_str());
+			strcpy_s(ruler_outtext, outputstr.c_str());
 			wsprintfA(crossFormat, "<P=%d,%d><S=%d>%s", crossX, crossY, crossSize, ruler_outtext);
 			UpdateOSD(crossFormat, Map1);
 			UpdateOSD("<P=0,0><S=100>", Map2);

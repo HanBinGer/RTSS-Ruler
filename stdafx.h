@@ -12,3 +12,4 @@
 #include <tchar.h>
 
 #include<string>
+#include <cmath>
