@@ -18,9 +18,9 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 DWORD WINAPI ThreadProc(LPVOID param);
 BOOL UpdateOSD(LPCSTR lpText, LPCSTR mapName);
 void ReleaseOSD(LPCSTR mapName);
-DWORD ruler_scale = 225;
-DWORD ruler_pixscale = 100;
-DWORD ruler_dist = 225;
+double ruler_scale = 225;
+double ruler_pixscale = 100;
+double ruler_dist = 225;
 std::string outputstr = "";
 CHAR ruler_outtext[256]="0";
 bool changeState;
@@ -234,8 +234,8 @@ DWORD WINAPI ThreadProc(LPVOID param)
 			double x = first.x - second.x;
 			double y = first.y - second.y;
 			changeState = false;
-			DWORD newdistance = (sqrt(x * x + y * y) / ruler_pixscale) * ruler_scale;
-			double ang;
+			long double newdistance = (sqrt(x * x + y * y) * ruler_scale / ruler_pixscale) ;
+			long double ang;
 			if (x > 0) {
 				if (y < 0) {
 					ang = std::atan(x / (-y)) * 180 / M_PI;
