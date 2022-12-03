@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "RTSS_Ruler.h"
 #include "RTSSSharedMemory.h"
+#include "ScreenCapture.h"
+#include "OpenCVPart.h"
 
 #define M_PI 3.14159265358979323846
 
@@ -22,7 +24,7 @@ double ruler_scale = 225;
 double ruler_pixscale = 100;
 double ruler_dist = 225;
 std::string outputstr = "";
-CHAR ruler_outtext[256]="0";
+CHAR ruler_outtext[256]="Distance: 0\r\nAzimuth: 0";
 bool changeState;
 POINT first, second;
 HWND hWnd;
@@ -32,6 +34,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_ LPWSTR    lpCmdLine,
 	_In_ int       nCmdShow)
 {
+	initSrc();
+
 	UNREFERENCED_PARAMETER(hPrevInstance);
 	UNREFERENCED_PARAMETER(lpCmdLine);
 
@@ -93,7 +97,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER,
 		104, 174, 100, 20, hWnd, (HMENU)3, hInstance, NULL);
 
-	UpdateOSD("0", Map1);
+	UpdateOSD("Distance: 0\r\nAzimuth: 0", Map1);
 	UpdateOSD("", Map2);
 
 	DWORD dwThreadId;
@@ -150,14 +154,73 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
 DWORD WINAPI ThreadProc(LPVOID param)
 {
+	char markKey;
+	{
+		std::ifstream iFile("config.ini");
+		std::string str;
+		std::getline(iFile, str);
+		if (str == "") {
+			markKey = 0x51;
+		}
+		else if (str.substr(10, 2) == "X1") {
+			markKey = 0x05;
+		}
+		else if (str.substr(10, 2) == "X2") {
+			markKey = 0x06;
+		}
+		else {
+			markKey = VkKeyScanA(str[10]);
+		}
+
+	}
+
 	int crossX = 0, crossY = 0, crossSize = 100;
 	changeState = false;
 	CHAR crossFormat[256];
 
-	
+	INPUT MDown;
+	//ZeroMemory(&MDown, sizeof(INPUT));
+	MDown.type = INPUT_KEYBOARD;
+	MDown.ki.wScan = MapVirtualKeyA(0x4D, MAPVK_VK_TO_VSC);
+	MDown.ki.wVk = 0x4D;
+	MDown.ki.dwFlags = 0 | KEYEVENTF_SCANCODE;
+	MDown.ki.time = 0;
+	MDown.ki.dwExtraInfo = 0;
+
+	cv::dnn::Net net;
+	initNet(net);
+	std::vector<Detection> myMark;
+	std::vector<Detection> yellMark;
+	cv::Point center_of_rect;
 
 	while (TRUE) {
+		if (GetAsyncKeyState(markKey)) {
+			std::cout << "markKey" << std::endl;
+			Sleep(100);
+			MDown.ki.dwFlags = 0;
+			SendInput(1, &MDown, sizeof(INPUT));
+			Sleep(50);
+			take_screenshot("temp/screen.png");
+			MDown.ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_SCANCODE;
+			SendInput(1, &MDown, sizeof(INPUT));
 
+			cropImg();
+			yolo(net, myMark, yellMark);
+			if (!myMark.empty()) {
+				center_of_rect = (myMark[0].box.br() + myMark[0].box.tl()) * 0.5;
+				second.x = center_of_rect.x;
+				second.y = center_of_rect.y;
+				changeState = true;
+				myMark.clear();
+			}
+			if (!yellMark.empty()) {
+				center_of_rect = (yellMark[0].box.br() + yellMark[0].box.tl()) * 0.5;
+				first.x = center_of_rect.x;
+				first.y = center_of_rect.y;
+				changeState = true;
+				yellMark.clear();
+			}
+		}
 		if (GetAsyncKeyState(VK_F1)) {
 			GetCursorPos(&first);
 			changeState = true;

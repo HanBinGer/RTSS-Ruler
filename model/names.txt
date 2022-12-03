@@ -1,0 +1,7 @@
+I
+cursor
+enemymark
+mark
+scale
+squad
+trash
