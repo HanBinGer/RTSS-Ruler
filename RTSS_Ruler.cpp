@@ -34,6 +34,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_ LPWSTR    lpCmdLine,
 	_In_ int       nCmdShow)
 {
+	SetProcessDPIAware();
 	initSrc();
 
 	UNREFERENCED_PARAMETER(hPrevInstance);
@@ -62,7 +63,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
 	/*HWND*/ hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
 		CW_USEDEFAULT, 0,
-		425, GetSystemMetrics(SM_CYMIN) + 200,
+		425, GetSystemMetrics(SM_CYMIN) + 210,
 		nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd)
@@ -72,7 +73,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		TEXT("EDIT"),
 		TEXT("Distance: 0\r\nAzimuth: 0"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY,
-		2, 2, 400, 36, hWnd, (HMENU)4, hInstance, NULL);
+		2, 2, 400, 44, hWnd, (HMENU)4, hInstance, NULL);
 	
 	CreateWindowW(
 		TEXT("EDIT"),
@@ -85,17 +86,17 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			"RightCtrl + Num+ - increase size by 10% \r\n"
 			"RightCtrl + Num- - decrease size by 10%"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY,
-		2, 40, 400, 132, hWnd, (HMENU)1, hInstance, NULL);
+		2, 48, 400, 132, hWnd, (HMENU)1, hInstance, NULL);
 
 	CreateWindowW(
 		TEXT("EDIT"), TEXT("0"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER,
-		2, 174, 100, 20, hWnd, (HMENU)2, hInstance, NULL);
+		2, 182, 100, 20, hWnd, (HMENU)2, hInstance, NULL);
 
 	CreateWindowW(
 		TEXT("BUTTON"), TEXT("Apply"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER,
-		104, 174, 100, 20, hWnd, (HMENU)3, hInstance, NULL);
+		104, 182, 100, 20, hWnd, (HMENU)3, hInstance, NULL);
 
 	UpdateOSD("Distance: 0\r\nAzimuth: 0", Map1);
 	UpdateOSD("", Map2);
@@ -193,8 +194,11 @@ DWORD WINAPI ThreadProc(LPVOID param)
 	std::vector<Detection> yellMark;
 	cv::Point center_of_rect;
 
+	std::ofstream oFile;
+
 	while (TRUE) {
 		if (GetAsyncKeyState(markKey)) {
+			oFile.open("temp/coord.txt", std::ios_base::out | std::ios_base::trunc);
 			std::cout << "markKey" << std::endl;
 			Sleep(100);
 			MDown.ki.dwFlags = 0;
@@ -204,12 +208,16 @@ DWORD WINAPI ThreadProc(LPVOID param)
 			MDown.ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_SCANCODE;
 			SendInput(1, &MDown, sizeof(INPUT));
 
+			oFile << "Second: (" << second.x << ", " << second.y << ")" << std::endl;
+			oFile << "First: (" << first.x << ", " << first.y << ")" << std::endl;
+
 			cropImg();
 			yolo(net, myMark, yellMark);
 			if (!myMark.empty()) {
 				center_of_rect = (myMark[0].box.br() + myMark[0].box.tl()) * 0.5;
 				second.x = center_of_rect.x;
 				second.y = center_of_rect.y;
+				oFile << "My mark: (" << second.x << ", " << second.y << ")" << std::endl;
 				changeState = true;
 				myMark.clear();
 			}
@@ -217,16 +225,19 @@ DWORD WINAPI ThreadProc(LPVOID param)
 				center_of_rect = (yellMark[0].box.br() + yellMark[0].box.tl()) * 0.5;
 				first.x = center_of_rect.x;
 				first.y = center_of_rect.y;
+				oFile << "Yellow mark: (" << first.x << ", " << first.y << ")" << std::endl;
 				changeState = true;
 				yellMark.clear();
 			}
+			oFile << "Scale: " << ruler_pixscale << std::endl;
+			oFile.close();
 		}
 		if (GetAsyncKeyState(VK_F1)) {
-			GetCursorPos(&first);
+			GetPhysicalCursorPos(&first);
 			changeState = true;
 		}
 		if (GetAsyncKeyState(VK_F2)) {
-			GetCursorPos(&second);
+			GetPhysicalCursorPos(&second);
 			changeState = true;
 		}
 		if (GetAsyncKeyState(VK_F3)) {
