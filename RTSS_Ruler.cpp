@@ -200,7 +200,7 @@ DWORD WINAPI ThreadProc(LPVOID param)
 		if (GetAsyncKeyState(markKey)) {
 			oFile.open("temp/coord.txt", std::ios_base::out | std::ios_base::trunc);
 			std::cout << "markKey" << std::endl;
-			Sleep(100);
+			Sleep(150);
 			MDown.ki.dwFlags = 0;
 			SendInput(1, &MDown, sizeof(INPUT));
 			Sleep(50);
