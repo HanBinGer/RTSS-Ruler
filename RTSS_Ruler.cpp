@@ -23,6 +23,8 @@ void ReleaseOSD(LPCSTR mapName);
 double ruler_scale = 225;
 double ruler_pixscale = 100;
 double ruler_dist = 225;
+int indInterfaceSize = 2;
+bool SquadMark = false;
 std::string outputstr = "";
 CHAR ruler_outtext[256]="Distance: 0\r\nAzimuth: 0";
 bool changeState;
@@ -62,8 +64,8 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		return FALSE;
 
 	/*HWND*/ hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
-		CW_USEDEFAULT, 0,
-		425, GetSystemMetrics(SM_CYMIN) + 210,
+		CW_USEDEFAULT, CW_USEDEFAULT,
+		425, 340,//GetSystemMetrics(SM_CYMIN) + 230,
 		nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd)
@@ -73,7 +75,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		TEXT("EDIT"),
 		TEXT("Distance: 0\r\nAzimuth: 0"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY,
-		2, 2, 400, 44, hWnd, (HMENU)4, hInstance, NULL);
+		2, 2, 400, 44, hWnd, (HMENU)1, hInstance, NULL);
 	
 	CreateWindowW(
 		TEXT("EDIT"),
@@ -86,18 +88,65 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 			"RightCtrl + Num+ - increase size by 10% \r\n"
 			"RightCtrl + Num- - decrease size by 10%"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY,
-		2, 48, 400, 132, hWnd, (HMENU)1, hInstance, NULL);
+		2, 48, 400, 132, hWnd, NULL, hInstance, NULL);
 
 	CreateWindowW(
 		TEXT("EDIT"), TEXT("0"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER,
-		2, 182, 100, 20, hWnd, (HMENU)2, hInstance, NULL);
+		2, 184, 100, 20, hWnd, (HMENU)3, hInstance, NULL);
 
 	CreateWindowW(
-		TEXT("BUTTON"), TEXT("Apply"),
+		TEXT("BUTTON"), TEXT("Set Scale"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER,
-		104, 182, 100, 20, hWnd, (HMENU)3, hInstance, NULL);
+		104, 184, 150, 20, hWnd, (HMENU)4, hInstance, NULL);
 
+	CreateWindowW(
+		TEXT("EDIT"), TEXT("110"),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_CENTER,
+		2, 204, 100, 20, hWnd, (HMENU)5, hInstance, NULL);
+
+	CreateWindowW(
+		TEXT("BUTTON"), TEXT("Set Pixelscale"),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER,
+		104, 204, 150, 20, hWnd, (HMENU)6, hInstance, NULL);
+
+	TCHAR InterfaceSizes[5][5] =
+	{
+		TEXT("50%"), TEXT("67%"), TEXT("75%"), TEXT("83%"), TEXT("100%")
+	};
+
+	CreateWindowW(
+		TEXT("EDIT"), TEXT("Set Size of Interface: "),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY,
+		2, 234, 170, 27, hWnd, NULL, hInstance, NULL);
+
+	HWND hWndComboBox = CreateWindowW(WC_COMBOBOX, TEXT("Select Interface Size:"),
+		CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_CHILD | WS_OVERLAPPED | WS_VISIBLE,
+		173, 234, 150, 240, hWnd, (HMENU)7, hInstance,
+		NULL);
+
+	CreateWindowW(
+		TEXT("BUTTON"), TEXT("Squad-Mark distance"),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER | BS_AUTOCHECKBOX,
+		2, 262, 190, 20, hWnd, (HMENU)8, hInstance, NULL);
+
+	TCHAR A[16];
+	int  k = 0;
+
+	memset(&A, 0, sizeof(A));
+	for (k = 0; k <= 4; k += 1)
+	{
+		wcscpy_s(A, sizeof(A) / sizeof(TCHAR), (TCHAR*)InterfaceSizes[k]);
+
+		// Add string to combobox.
+		SendMessage(hWndComboBox, (UINT)CB_ADDSTRING, (WPARAM)0, (LPARAM)A);
+	}
+
+	// Send the CB_SETCURSEL message to display an initial item 
+	//  in the selection field  
+	SendMessage(hWndComboBox, CB_SETCURSEL, (WPARAM)2, (LPARAM)0);
+
+	
 	UpdateOSD("Distance: 0\r\nAzimuth: 0", Map1);
 	UpdateOSD("", Map2);
 
@@ -124,18 +173,37 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_COMMAND:
 	{
-		int wmId = LOWORD(wParam);
-		switch (wmId)
+		if (HIWORD(wParam) == CBN_SELCHANGE)
+			// If the user makes a selection from the list:
+			//   Send CB_GETCURSEL message to get the index of the selected list item.
+			//   Send CB_GETLBTEXT message to get the item.
+			//   Display the item in a messagebox.
 		{
-		case 3:
-			CHAR toScale[256];
-			GetDlgItemTextA(hWnd, 2, toScale, 256);
-			ruler_scale = std::strtoul(toScale, NULL, 10);
-			changeState = true;
-			break;
-
-		default:
-			return DefWindowProc(hWnd, message, wParam, lParam);
+			indInterfaceSize = SendMessage((HWND)lParam, (UINT)CB_GETCURSEL,
+				(WPARAM)0, (LPARAM)0);
+		}
+		else {
+			int wmId = LOWORD(wParam);
+			switch (wmId)
+			{
+			case 4:
+				CHAR toScale[256];
+				GetDlgItemTextA(hWnd, 3, toScale, 256);
+				ruler_scale = std::strtoul(toScale, NULL, 10);
+				changeState = true;
+				break;
+			case 6:
+				CHAR toPixelScale[256];
+				GetDlgItemTextA(hWnd, 5, toPixelScale, 256);
+				ruler_pixscale = std::strtoul(toPixelScale, NULL, 10);
+				changeState = true;
+				break;
+			case 8:
+				SquadMark = IsDlgButtonChecked(hWnd, 8);
+				break;
+			default:
+				return DefWindowProc(hWnd, message, wParam, lParam);
+			}
 		}
 	}
 	break;
@@ -162,6 +230,38 @@ DWORD WINAPI ThreadProc(LPVOID param)
 		std::getline(iFile, str);
 		if (str == "") {
 			markKey = 0x51;
+		}
+		else if (str[10] == 'F') {
+			switch (str[11]) {
+			case 1:
+				markKey = 0x70;
+				break;
+			case 2:
+				markKey = 0x71;
+				break;
+			case 3:
+				markKey = 0x72;
+				break;
+			case 4:
+				markKey = 0x73;
+				break;
+			case 5:
+				markKey = 0x74;
+				break;
+			case 6:
+				markKey = 0x75;
+				break;
+			case 7:
+				markKey = 0x76;
+				break;
+			case 8:
+				markKey = 0x77;
+				break;
+			case 9:
+				markKey = 0x78;
+				break;
+			}
+
 		}
 		else if (str.substr(10, 2) == "X1") {
 			markKey = 0x05;
@@ -192,6 +292,7 @@ DWORD WINAPI ThreadProc(LPVOID param)
 	initNet(net);
 	std::vector<Detection> myMark;
 	std::vector<Detection> yellMark;
+	std::vector<Detection> squadMark;
 	cv::Point center_of_rect;
 
 	std::ofstream oFile;
@@ -203,7 +304,7 @@ DWORD WINAPI ThreadProc(LPVOID param)
 			Sleep(150);
 			MDown.ki.dwFlags = 0;
 			SendInput(1, &MDown, sizeof(INPUT));
-			Sleep(50);
+			Sleep(200);
 			take_screenshot("temp/screen.png");
 			MDown.ki.dwFlags = KEYEVENTF_KEYUP | KEYEVENTF_SCANCODE;
 			SendInput(1, &MDown, sizeof(INPUT));
@@ -211,20 +312,27 @@ DWORD WINAPI ThreadProc(LPVOID param)
 			oFile << "Second: (" << second.x << ", " << second.y << ")" << std::endl;
 			oFile << "First: (" << first.x << ", " << first.y << ")" << std::endl;
 
-			cropImg();
-			yolo(net, myMark, yellMark);
-			if (!myMark.empty()) {
-				center_of_rect = (myMark[0].box.br() + myMark[0].box.tl()) * 0.5;
-				second.x = center_of_rect.x;
-				second.y = center_of_rect.y;
+			cropImg(indInterfaceSize);
+			yolo(net, myMark, yellMark, squadMark);
+			if (!SquadMark && !myMark.empty()) {
+				//center_of_rect = (myMark[0].box.br() + myMark[0].box.tl()) * 0.5;
+				second.x = std::round(myMark[0].center.x);
+				second.y = std::round(myMark[0].center.y);
 				oFile << "My mark: (" << second.x << ", " << second.y << ")" << std::endl;
 				changeState = true;
 				myMark.clear();
 			}
+			if (SquadMark && !squadMark.empty()) {
+				second.x = std::round(squadMark[0].center.x);
+				second.y = std::round(squadMark[0].center.y);
+				oFile << "Squad mark: (" << second.x << ", " << second.y << ")" << std::endl;
+				changeState = true;
+				squadMark.clear();
+			}
 			if (!yellMark.empty()) {
-				center_of_rect = (yellMark[0].box.br() + yellMark[0].box.tl()) * 0.5;
-				first.x = center_of_rect.x;
-				first.y = center_of_rect.y;
+				//center_of_rect = (yellMark[0].box.br() + yellMark[0].box.tl()) * 0.5;
+				first.x = std::round(yellMark[0].center.x);
+				first.y = std::round(yellMark[0].center.y);
 				oFile << "Yellow mark: (" << first.x << ", " << first.y << ")" << std::endl;
 				changeState = true;
 				yellMark.clear();
@@ -244,6 +352,7 @@ DWORD WINAPI ThreadProc(LPVOID param)
 			double x = first.x - second.x;
 			double y = first.y - second.y;
 			ruler_pixscale = sqrt(x * x + y * y);
+			SetDlgItemInt(hWnd, 5, (int)ruler_pixscale, false);
 			changeState = true;
 		}
 
@@ -327,7 +436,7 @@ DWORD WINAPI ThreadProc(LPVOID param)
 				}
 			}
 			outputstr = "Distance: " + std::to_string(newdistance) + "\r\nAzimuth: " + std::to_string(ang);
-			SetDlgItemTextA(hWnd, 4, outputstr.c_str());
+			SetDlgItemTextA(hWnd, 1, outputstr.c_str());
 			strcpy_s(ruler_outtext, outputstr.c_str());
 			wsprintfA(crossFormat, "<P=%d,%d><S=%d>%s", crossX, crossY, crossSize, ruler_outtext);
 			UpdateOSD(crossFormat, Map1);

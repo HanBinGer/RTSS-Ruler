@@ -1,18 +1,47 @@
 #pragma once
 #include "stdafx.h"
 
-void cropImg() {
+void cropImg(int indInterfaceSize = 2) {
 	int x_left = 0, x_right = 0, y_top = 0, y_bottom = 0;
 	cv::Mat img = cv::imread("temp/screen.png");
 	if (img.size().height == 1080 && img.size().width == 1920) {
-		x_left = 825;
-		x_right = 1648;
-		y_top = 193;
-		y_bottom = 1016;
-		/*x_left = 866;
-		x_right = 1665;
-		y_top = 212;
-		y_bottom = 1011;*/
+        switch (indInterfaceSize) {
+        case 0:
+            x_left = 741;
+            x_right = 1488;
+            y_top = 133;
+            y_bottom = 880;
+            break;
+        case 1:
+            x_left = 780;
+            x_right = 1628;
+            y_top = 174;
+            y_bottom = 1022;
+            break;
+        case 2:
+            x_left = 825;
+            x_right = 1648;
+            y_top = 193;
+            y_bottom = 1016;
+            break;
+        case 3:
+            x_left = 866;
+            x_right = 1665;
+            y_top = 212;
+            y_bottom = 1011;
+            break;
+        case 4:
+            x_left = 954;
+            x_right = 1703;
+            y_top = 251;
+            y_bottom = 1000;
+            break;
+        default:
+            x_left = 866;
+            x_right = 1665;
+            y_top = 212;
+            y_bottom = 1011;
+        }
 	}
 	else if (img.size().height == 1440 && img.size().width == 2560) {
 		x_left = 1094;
@@ -67,6 +96,7 @@ struct Detection
 {
     int class_id;
     float confidence;
+    cv::Point center;
     cv::Rect box;
     bool operator<(const Detection& X) const {
         if (confidence < X.confidence) return true;
@@ -104,6 +134,7 @@ void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, c
     std::vector<int> class_ids;
     std::vector<float> confidences;
     std::vector<cv::Rect> boxes;
+    std::vector<cv::Point> centers;
 
     for (int i = 0; i < rows; ++i) {
 
@@ -123,12 +154,15 @@ void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, c
 
                 float x = data[0];
                 float y = data[1];
+
+                centers.push_back(cv::Point(x * x_factor, y * y_factor));
+
                 float w = data[2];
                 float h = data[3];
-                int left = int((x - 0.5 * w) * x_factor);
-                int top = int((y - 0.5 * h) * y_factor);
-                int width = int(w * x_factor);
-                int height = int(h * y_factor);
+                int left = std::round((x - 0.5 * w) * x_factor);
+                int top = std::round((y - 0.5 * h) * y_factor);
+                int width = std::round(w * x_factor);
+                int height = std::round(h * y_factor);
                 boxes.push_back(cv::Rect(left, top, width, height));
             }
 
@@ -146,6 +180,7 @@ void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, c
         result.class_id = class_ids[idx];
         result.confidence = confidences[idx];
         result.box = boxes[idx];
+        result.center = centers[idx];
         output.push_back(result);
     }
 }
@@ -155,7 +190,7 @@ void initNet(cv::dnn::Net& net) {
     load_net(net, is_cuda);
 }
 
-void yolo(cv::dnn::Net &net, std::vector<Detection> &myMark, std::vector<Detection> &yellMark)
+void yolo(cv::dnn::Net &net, std::vector<Detection> &myMark, std::vector<Detection> &yellMark, std::vector<Detection> &squadMark)
 {
 
     std::vector<std::string> class_list = load_class_list();
@@ -177,12 +212,19 @@ void yolo(cv::dnn::Net &net, std::vector<Detection> &myMark, std::vector<Detecti
             yellMark.push_back(detection);
         else if (classId == 0)
             myMark.push_back(detection);
+        else if (classId == 5)
+            squadMark.push_back(detection);
         cv::rectangle(frame, box, color, 1);
+        
 
         //cv::rectangle(frame, cv::Point(box.x, box.y - 20), cv::Point(box.x + box.width, box.y), color, cv::FILLED);
         cv::putText(frame, (class_list[classId] + "  " + std::to_string(detection.confidence)).c_str(), cv::Point(box.x, box.y - 5), cv::FONT_HERSHEY_COMPLEX, 0.4, cv::Scalar(0, 0, 0), 1.4);
     }
     cv::imwrite("temp/recogn.png", frame);
-    std::sort(yellMark.rbegin(), yellMark.rend());
-    std::sort(myMark.rbegin(), myMark.rend());
+    if(!yellMark.empty())
+        std::sort(yellMark.rbegin(), yellMark.rend());
+    if (!myMark.empty())
+        std::sort(myMark.rbegin(), myMark.rend());
+    if (!squadMark.empty())
+        std::sort(squadMark.rbegin(), squadMark.rend());
 }

@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 #include <windows.h>
+#include <CommCtrl.h>
 #include <iostream>
 #include <GdiPlus.h>
 #include <wingdi.h>
