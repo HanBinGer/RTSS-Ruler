@@ -49,6 +49,18 @@ void cropImg(int indInterfaceSize = 2) {
 		y_top = 251;
 		y_bottom = 1360;
 	}
+    else if (img.size().height == 1440 && img.size().width == 3440) {
+        x_left = 1534;
+        x_right = 2643;
+        y_top = 251;
+        y_bottom = 1360;
+    }
+    else if (img.size().height == 2160 && img.size().width == 3840) {
+        x_left = 1544;
+        x_right = 3274;
+        y_top = 330;
+        y_bottom = 2060;
+    }
 	cv::Mat imgCrop = img(cv::Range(y_top, y_bottom), cv::Range(x_left, x_right));
 	imwrite("temp/map.png", imgCrop);
 }
@@ -67,7 +79,7 @@ std::vector<std::string> load_class_list()
 
 void load_net(cv::dnn::Net& net, bool is_cuda)
 {
-    auto result = cv::dnn::readNet("model/best.onnx");
+    auto result = cv::dnn::readNet("model/best823.onnx");
     if (is_cuda)
     {
         std::cout << "Attempty to use CUDA\n";
@@ -85,8 +97,8 @@ void load_net(cv::dnn::Net& net, bool is_cuda)
 
 const std::vector<cv::Scalar> colors = { cv::Scalar(255, 255, 0), cv::Scalar(0, 255, 0), cv::Scalar(0, 255, 255), cv::Scalar(255, 0, 0) };
 
-const float INPUT_WIDTH = 640.0;
-const float INPUT_HEIGHT = 640.0;
+const float INPUT_WIDTH = 832.0;
+const float INPUT_HEIGHT = 832.0;
 const float SCORE_THRESHOLD = 0.2;
 const float NMS_THRESHOLD = 0.4;
 const float CONFIDENCE_THRESHOLD = 0.4;
@@ -121,8 +133,9 @@ void detect(cv::Mat& image, cv::dnn::Net& net, std::vector<Detection>& output, c
     cv::dnn::blobFromImage(input_image, blob, 1. / 255., cv::Size(INPUT_WIDTH, INPUT_HEIGHT), cv::Scalar(), true, false);
     net.setInput(blob);
     std::vector<cv::Mat> outputs;
+    
     net.forward(outputs, net.getUnconnectedOutLayersNames());
-
+    
     float x_factor = input_image.cols / INPUT_WIDTH;
     float y_factor = input_image.rows / INPUT_HEIGHT;
 

@@ -28,8 +28,9 @@ bool SquadMark = false;
 std::string outputstr = "";
 CHAR ruler_outtext[256]="Distance: 0\r\nAzimuth: 0";
 bool changeState;
+bool overlay = false, pu = false;
 POINT first, second;
-HWND hWnd;
+HWND hWnd, hPop;
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	_In_opt_ HINSTANCE hPrevInstance,
@@ -63,9 +64,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	if (!RegisterClassExW(&wcex))
 		return FALSE;
 
-	/*HWND*/ hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+	/*HWND*/ hWnd = CreateWindowW(szWindowClass, szTitle, WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
 		CW_USEDEFAULT, CW_USEDEFAULT,
-		425, 340,//GetSystemMetrics(SM_CYMIN) + 230,
+		425, 384,//GetSystemMetrics(SM_CYMIN) + 230,
 		nullptr, nullptr, hInstance, nullptr);
 
 	if (!hWnd)
@@ -129,6 +130,38 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 		TEXT("BUTTON"), TEXT("Squad-Mark distance"),
 		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER | BS_AUTOCHECKBOX,
 		2, 262, 190, 20, hWnd, (HMENU)8, hInstance, NULL);
+	
+	CreateWindowW(
+		TEXT("BUTTON"), TEXT("Overlay"),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER | BS_AUTOCHECKBOX,
+		2, 284, 190, 20, hWnd, (HMENU)9, hInstance, NULL);
+	CreateWindowW(
+		TEXT("BUTTON"), TEXT("Pop-Up"),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | BS_CENTER | BS_VCENTER | BS_AUTOCHECKBOX,
+		2, 306, 190, 20, hWnd, (HMENU)10, hInstance, NULL);
+
+	/*WNDCLASSEXW wcpop;
+
+	wcpop.cbSize = sizeof(WNDCLASSEX);
+	wcpop.style = CS_HREDRAW | CS_VREDRAW;
+	wcpop.lpfnWndProc = WndProc;
+	wcpop.hInstance = hInstance;
+	wcpop.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+	wcpop.lpszClassName = szWindowClass;*/
+
+	hPop = CreateWindowW(szWindowClass, NULL,
+		WS_DLGFRAME | WS_POPUP,
+		1778, 630, 200, 54, NULL, NULL, hInstance, NULL);
+	//SetWindowPos(hPop, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+
+	CreateWindowW(
+		TEXT("EDIT"),
+		TEXT("Distance: 0\r\nAzimuth: 0"),
+		WS_CHILD | WS_VISIBLE | WS_BORDER | ES_LEFT | ES_MULTILINE | ES_READONLY | WS_EX_TOPMOST,
+		2, 2, 190, 44, hPop, (HMENU)0, hInstance, NULL);
+
+	//ShowWindow(hPop, SW_SHOWNOACTIVATE);
+	//SetWindowPos(hPop, HWND_TOPMOST, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE);
 
 	TCHAR A[16];
 	int  k = 0;
@@ -146,8 +179,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 	//  in the selection field  
 	SendMessage(hWndComboBox, CB_SETCURSEL, (WPARAM)2, (LPARAM)0);
 
+
+	SetWindowPos(hWnd, NULL, 0, 0, 0, 0, SWP_NOMOVE or SWP_NOSIZE); //HWND_TOPMOST
 	
-	UpdateOSD("Distance: 0\r\nAzimuth: 0", Map1);
+	UpdateOSD("", Map1); //"Distance: 0\r\nAzimuth: 0"
 	UpdateOSD("", Map2);
 
 	DWORD dwThreadId;
@@ -200,6 +235,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				break;
 			case 8:
 				SquadMark = IsDlgButtonChecked(hWnd, 8);
+				break;
+			case 9:
+				overlay = IsDlgButtonChecked(hWnd, 9);
+				break;
+			case 10:
+				pu = IsDlgButtonChecked(hWnd, 10);
 				break;
 			default:
 				return DefWindowProc(hWnd, message, wParam, lParam);
@@ -435,12 +476,27 @@ DWORD WINAPI ThreadProc(LPVOID param)
 					ang = 180 + std::atan((-x) / y) * 180 / M_PI;
 				}
 			}
-			outputstr = "Distance: " + std::to_string(newdistance) + "\r\nAzimuth: " + std::to_string(ang);
+			outputstr = /*std::to_string(newdistance) + "    " + std::to_string(ang);*/ "Distance: " + std::to_string(newdistance) + "\r\nAzimuth: " + std::to_string(ang);
 			SetDlgItemTextA(hWnd, 1, outputstr.c_str());
-			strcpy_s(ruler_outtext, outputstr.c_str());
-			wsprintfA(crossFormat, "<P=%d,%d><S=%d>%s", crossX, crossY, crossSize, ruler_outtext);
-			UpdateOSD(crossFormat, Map1);
-			UpdateOSD("<P=0,0><S=100>", Map2);
+			SetDlgItemTextA(hPop, 0, outputstr.c_str());
+			if (overlay) {
+				strcpy_s(ruler_outtext, outputstr.c_str());
+				wsprintfA(crossFormat, "<P=%d,%d><S=%d>%s", crossX, crossY, crossSize, ruler_outtext);
+				UpdateOSD(crossFormat, Map1);
+				UpdateOSD("<P=0,0><S=100>", Map2);
+			}
+			else {
+				strcpy_s(ruler_outtext, "");
+				wsprintfA(crossFormat, "<P=%d,%d><S=%d>%s", crossX, crossY, crossSize, ruler_outtext);
+				UpdateOSD(crossFormat, Map1);
+				UpdateOSD("<P=0,0><S=100>", Map2);
+			}
+			if (pu == true) {
+				SetWindowPos(hPop, HWND_TOPMOST, 0, 0, 0, 0, SWP_SHOWWINDOW | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+				Sleep(2500);
+				SetWindowPos(hPop, HWND_TOPMOST, 0, 0, 0, 0, SWP_HIDEWINDOW | SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+			}
+			
 		}
 
 		Sleep(100);
